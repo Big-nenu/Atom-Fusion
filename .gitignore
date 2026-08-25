@@ -1,0 +1,25 @@
+# Registro de cambios
+node_modules/
+dist/
+node_modules/.bin/
+node_modules/.vite/
+
+# Archivos de log/temp
+*.log
+*.tmp
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.iml
+
+# Entorno / secretos
+.env
+.env.local
+.env.*.local

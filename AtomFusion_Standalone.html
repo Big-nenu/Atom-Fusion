@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1020" />
+  <title>Atom-Fusion - Standalone</title>
+  
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #0b1020;
+      --bg-light: #161d33;
+      --accent: #4cc9f0;
+      --text: #e0e6ed;
+      --text-dim: #94a3b8;
+      --danger: #f72585;
+      --success: #4ade80;
+      --gold: #fbbf24;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { 
+      background-color: var(--bg); 
+      color: var(--text); 
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      overflow: hidden;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    .app-header {
+      padding: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(22, 29, 51, 0.8);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      z-index: 10;
+    }
+
+    .app-header h1 { font-size: 1.2rem; font-weight: 600; }
+    .header-right { display: flex; align-items: center; gap: 0.75rem; }
+    .progress { 
+      font-family: monospace; 
+      background: rgba(0,0,0,0.3); 
+      padding: 0.2rem 0.5rem; 
+      border-radius: 4px; 
+      font-size: 0.9rem;
+      color: var(--accent);
+    }
+    .mini-ency {
+      background: none; border: none; font-size: 1.4rem; cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .mini-ency:active { transform: scale(1.2); }
+
+    .board {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: radial-gradient(circle at center, #1a2440 0%, #0b1020 100%);
+    }
+
+    .fusion-zone {
+      position: absolute;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      width: 140px; height: 140px;
+      border-radius: 50%;
+      border: 3px dashed var(--accent);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 10px;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      background: rgba(76, 201, 240, 0.05);
+      z-index: 1;
+    }
+    .fusion-zone.active { transform: translate(-50%, -50%) scale(1.1); background: rgba(76, 201, 240, 0.15); }
+    .fusion-zone.error { border-color: var(--danger); animation: shake 0.4s; }
+    .fusion-zone.fuse { border-color: var(--success); animation: pulse 0.5s; }
+
+    @keyframes shake {
+      0%, 100% { transform: translate(-50%, -50%) translateX(0); }
+      25% { transform: translate(-50%, -50%) translateX(-5px); }
+      75% { transform: translate(-50%, -50%) translateX(5px); }
+    }
+    @keyframes pulse {
+      0% { transform: translate(-50%, -50%) scale(1); }
+      50% { transform: translate(-50%, -50%) scale(1.2); }
+      100% { transform: translate(-50%, -50%) scale(1); }
+    }
+
+    .piece {
+      position: absolute;
+      cursor: grab;
+      touch-action: none;
+      z-index: 5;
+      will-change: transform;
+    }
+    .piece:active { cursor: grabbing; }
+
+    .chip {
+      width: 58px; height: 58px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--bg-light), var(--bg));
+      border: 2px solid rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      pointer-events: none;
+    }
+    .chip.compact { width: 32px; height: 32px; font-size: 1rem; }
+
+    .inventory {
+      padding: 1rem;
+      background: var(--bg-light);
+      border-top: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      white-space: nowrap;
+      z-index: 10;
+      -webkit-overflow-scrolling: touch;
+    }
+    .inv-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .inv-item:active { transform: scale(0.9); }
+    .inv-name { font-size: 0.7rem; color: var(--text-dim); }
+
+    .ency-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(5px);
+      z-index: 100;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .ency-modal {
+      background: var(--bg-light);
+      width: 90%; max-width: 500px;
+      max-height: 80vh;
+      border-radius: 20px;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid rgba(255,255,255,0.1);
+      overflow: hidden;
+    }
+    .ency-header {
+      padding: 1.5rem;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .ency-content {
+      padding: 1.5rem;
+      overflow-y: auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 1rem;
+    }
+    .ency-card {
+      background: var(--bg);
+      padding: 1rem;
+      border-radius: 12px;
+      text-align: center;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .ency-card.locked { opacity: 0.5; filter: grayscale(1); }
+    .ency-card-emoji { font-size: 2rem; display: block; margin-bottom: 0.5rem; }
+    .ency-recipe { 
+      margin-top: 0.5rem; 
+      font-size: 0.8rem; 
+      color: var(--accent); 
+      font-family: monospace;
+    }
+
+    .toast {
+      position: fixed; bottom: 100px; left: 50%;
+      transform: translateX(-50%);
+      background: var(--accent);
+      color: var(--bg);
+      padding: 0.6rem 1.2rem;
+      border-radius: 20px;
+      font-weight: 600;
+      z-index: 200;
+      animation: slideUp 0.3s ease-out;
+    }
+    @keyframes slideUp { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const PARTICLES = {
+      up: { id: 'up', name: 'Quark Up', symbol: '↑', color: '#ff4d4d' },
+      down: { id: 'down', name: 'Quark Down', symbol: '↓', color: '#4d79ff' },
+      electron: { id: 'electron', name: 'Electrón', symbol: 'e-', color: '#ffff4d' },
+      photon: { id: 'photon', name: 'Fotón', symbol: 'γ', color: '#ffffff' },
+      proton: { id: 'proton', name: 'Protón', symbol: 'p+', color: '#ff8c00' },
+      neutron: { id: 'neutron', name: 'Neutrón', symbol: 'n0', color: '#a0a0a0' },
+      helion: { id: 'helion', name: 'Núcleo de Helio', symbol: 'He+', color: '#ff00ff' },
+      hydrogen: { id: 'hydrogen', name: 'Hidrógeno', symbol: 'H', color: '#00ffff' },
+      oxygen: { id: 'oxygen', name: 'Oxígeno', symbol: 'O', color: '#ff0000' },
+      water: { id: 'water', name: 'Agua', symbol: 'H2O', color: '#4cc9f0' },
+    };
+
+    const ALL_PARTICLE_IDS = Object.keys(PARTICLES);
+    const STARTING_PARTICLE_IDS = ['up', 'down', 'electron', 'photon'];
+
+    const RECIPES = [
+      { result: 'proton', ingredients: { up: 2, down: 1 } },
+      { result: 'neutron', ingredients: { up: 1, down: 2 } },
+      { result: 'helion', ingredients: { proton: 2, neutron: 2 } },
+      { result: 'hydrogen', ingredients: { proton: 1, electron: 1 } },
+      { result: 'oxygen', ingredients: { helion: 1, electron: 2 } },
+      { result: 'water', ingredients: { hydrogen: 2, oxygen: 1 } },
+    ];
+
+    function countsOf(list) {
+      const counts = {};
+      for (const id of list) counts[id] = (counts[id] || 0) + 1;
+      return counts;
+    }
+
+    function isSubset(needle, haystack) {
+      for (const key in needle) if ((haystack[key] || 0) < needle[key]) return false;
+      return true;
+    }
+
+    function isExactlyEqual(a, b) {
+      const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+      for (const key of keys) if ((a[key] || 0) !== (b[key] || 0)) return false;
+      return true;
+    }
+
+    function resolveRecipe(contents) {
+      if (contents.length === 0) return { type: 'empty' };
+      const multiset = countsOf(contents);
+      for (const recipe of RECIPES) {
+        if (isExactlyEqual(multiset, recipe.ingredients)) return { type: 'fuse', recipe, result: recipe.result };
+      }
+      for (const recipe of RECIPES) {
+        if (isSubset(multiset, recipe.ingredients)) return { type: 'incomplete' };
+      }
+      return { type: 'invalid' };
+    }
+
+    function ParticleChip({ particle, size = 58, compact = false }) {
+      return (
+        <div className={`chip ${compact ? 'compact' : ''}`} style={{ 
+          width: compact ? 32 : size, 
+          height: compact ? 32 : size, 
+          borderColor: particle.color,
+          color: particle.color,
+          fontSize: compact ? '1rem' : '1.5rem'
+        }}>
+          {particle.symbol}
+        </div>
+      );
+    }
+
+    function Draggable({ children, style, onRelease }) {
+      const ref = useRef(null);
+      const pos = useRef({ x: 0, y: 0 });
+      const isDragging = useRef(false);
+
+      useEffect(() => {
+        const el = ref.current;
+        let startX, startY;
+
+        const onStart = (e) => {
+          isDragging.current = true;
+          const touch = e.touches ? e.touches[0] : e;
+          startX = touch.clientX - pos.current.x;
+          startY = touch.clientY - pos.current.y;
+          el.style.zIndex = 1000;
+        };
+
+        const onMove = (e) => {
+          if (!isDragging.current) return;
+          const touch = e.touches ? e.touches[0] : e;
+          pos.current.x = touch.clientX - startX;
+          pos.current.y = touch.clientY - startY;
+          el.style.transform = `translate(${pos.current.x}px, ${pos.current.y}px)`;
+        };
+
+        const onEnd = (e) => {
+          if (!isDragging.current) return;
+          isDragging.current = false;
+          el.style.zIndex = 5;
+          const touch = e.changedTouches ? e.changedTouches[0] : e;
+          onRelease({ pointerX: touch.clientX, pointerY: touch.clientY });
+          pos.current = { x: 0, y: 0 };
+          el.style.transform = `translate(0, 0)`;
+        };
+
+        el.addEventListener('pointerdown', onStart);
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onEnd);
+        return () => {
+          el.removeEventListener('pointerdown', onStart);
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('pointerup', onEnd);
+        };
+      }, [onRelease]);
+
+      return <div ref={ref} className="piece" style={style}>{children}</div>;
+    }
+
+    function FusionZone({ contents, onClear, fx }) {
+      return (
+        <div 
+          id="fusion-zone"
+          className={`fusion-zone ${contents.length > 0 ? 'active' : ''} ${fx?.type === 'error' ? 'error' : ''} ${fx?.type === 'fuse' ? 'fuse' : ''}`}
+          onClick={onClear}
+        >
+          {contents.map((id, i) => (
+            <ParticleChip key={i} particle={PARTICLES[id]} compact />
+          ))}
+        </div>
+      );
+    }
+
+    function Inventory({ discovered, onSpawn }) {
+      return (
+        <div className="inventory">
+          {ALL_PARTICLE_IDS.map(id => {
+            if (!discovered.has(id)) return null;
+            const p = PARTICLES[id];
+            return (
+              <div key={id} className="inv-item" onClick={() => onSpawn(id)}>
+                <ParticleChip particle={p} compact />
+                <span className="inv-name">{p.name}</span>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    function Encyclopedia({ discovered, onClose }) {
+      return (
+        <div className="ency-overlay" onClick={onClose}>
+          <div className="ency-modal" onClick={e => e.stopPropagation()}>
+            <div className="ency-header">
+              <h2>📖 Enciclopedia</h2>
+              <button className="mini-ency" onClick={onClose}>✖</button>
+            </div>
+            <div className="ency-content">
+              {ALL_PARTICLE_IDS.map(id => {
+                const p = PARTICLES[id];
+                const isUnlocked = discovered.has(id);
+                const recipe = RECIPES.find(r => r.result === id);
+                return (
+                  <article key={id} className={`ency-card ${!isUnlocked ? 'locked' : ''}`}>
+                    <span className="ency-card-emoji">{isUnlocked ? p.symbol : '❔'}</span>
+                    <strong>{isUnlocked ? p.name : '???'}</strong>
+                    {isUnlocked && recipe && (
+                      <div className="ency-recipe">
+                        {Object.entries(recipe.ingredients).map(([ing, n]) => (
+                          <span key={ing}>{n > 1 ? `${n}×` : ''}{PARTICLES[ing].symbol} </span>
+                        ))}
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function App() {
+      const [discovered, setDiscovered] = useState(() => {
+        const saved = localStorage.getItem('atom-fusion-discovered');
+        return saved ? new Set(JSON.parse(saved)) : new Set(STARTING_PARTICLE_IDS);
+      });
+      const [board, setBoard] = useState([]);
+      const [zone, setZone] = useState([]);
+      const [zoneFx, setZoneFx] = useState(null);
+      const [toast, setToast] = useState(null);
+      const [showEncyclopedia, setShowEncyclopedia] = useState(false);
+
+      const nextId = useRef(1);
+      const boardRef = useRef(null);
+      const fxTimer = useRef(null);
+      const toastTimer = useRef(null);
+
+      useEffect(() => {
+        localStorage.setItem('atom-fusion-discovered', JSON.stringify([...discovered]));
+      }, [discovered]);
+
+      function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+      function getSpawnPos() {
+        const el = boardRef.current;
+        const w = el?.clientWidth || 360;
+        const h = el?.clientHeight || 300;
+        const cx = w / 2;
+        const cy = h / 2;
+        const minRadius = 140;
+        let x, y, attempts = 0;
+        do {
+          const r = Math.max(minRadius, 130 + (Math.random() * Math.min(w, h)) / 2);
+          const ang = Math.random() * Math.PI * 2;
+          x = clamp(cx + Math.cos(ang) * r, 46, w - 46);
+          y = clamp(cy + Math.sin(ang) * r, 60, h - 60);
+          attempts++;
+        } while (attempts < 10 && Math.hypot(x - cx, y - cy) < minRadius);
+        return { x, y };
+      }
+
+      function spawn(id, pos) {
+        const localId = nextId.current++;
+        const p = pos || getSpawnPos();
+        setBoard(b => [...b, { localId, particleId: id, ...p }]);
+      }
+
+      function spawnMany(ids) {
+        const newPieces = ids.map(id => ({
+          localId: nextId.current++,
+          particleId: id,
+          ...getSpawnPos()
+        }));
+        setBoard(b => [...b, ...newPieces]);
+      }
+
+      function clearBoard() { setBoard([]); }
+
+      function unlock(id) {
+        setDiscovered(prev => prev.has(id) ? prev : new Set(prev).add(id));
+      }
+
+      function notify(msg) {
+        clearTimeout(toastTimer.current);
+        setToast({ id: Date.now(), msg });
+        toastTimer.current = setTimeout(() => setToast(null), 2200);
+      }
+
+      useEffect(() => {
+        if (zone.length === 0) return;
+        const res = resolveRecipe(zone);
+        clearTimeout(fxTimer.current);
+
+        if (res.type === 'fuse') {
+          const name = PARTICLES[res.result].name;
+          setZone([]);
+          unlock(res.result);
+          spawn(res.result);
+          setZoneFx({ type: 'fuse', result: res.result });
+          notify(`Nuevo descubrimiento: ${name}`);
+          fxTimer.current = setTimeout(() => setZoneFx(null), 900);
+        } else if (res.type === 'invalid') {
+          setZoneFx({ type: 'error' });
+          fxTimer.current = setTimeout(() => {
+            setZoneFx(null);
+            spawnMany(zone);
+            setZone([]);
+          }, 850);
+        }
+      }, [zone]);
+
+      function handleDrop(localId, pos) {
+        const item = board.find(i => i.localId === localId);
+        if (!item) return;
+        
+        const zoneEl = document.getElementById('fusion-zone');
+        if (!zoneEl) return;
+        
+        const zoneRect = zoneEl.getBoundingClientRect();
+        if (
+            pos.pointerX >= zoneRect.left && pos.pointerX <= zoneRect.right &&
+            pos.pointerY >= zoneRect.top && pos.pointerY <= zoneRect.bottom
+        ) {
+          setBoard(prev => prev.filter(i => i.localId !== localId));
+          setZone(prev => [...prev, item.particleId]);
+        }
+      }
+
+      useEffect(() => {
+        spawnMany(['up', 'up', 'down', 'electron', 'photon']);
+      }, []);
+
+      const discoveredCount = ALL_PARTICLE_IDS.filter(id => discovered.has(id)).length;
+
+      return (
+        <div className="app">
+          <header className="app-header">
+            <h1>⚛️ Atom-Fusion</h1>
+            <div className="header-right">
+              <span className="progress">{discoveredCount} / {ALL_PARTICLE_IDS.length}</span>
+              <button className="mini-ency" title="Limpiar tablero" onClick={clearBoard}>🧹</button>
+              <button className="mini-ency" onClick={() => setShowEncyclopedia(true)}>📖</button>
+            </div>
+          </header>
+
+          <main className="board" ref={boardRef}>
+            {board.map(piece => (
+              <Draggable key={piece.localId} style={{ left: piece.x, top: piece.y }} onRelease={pos => handleDrop(piece.localId, pos)}>
+                <ParticleChip particle={PARTICLES[piece.particleId]} />
+              </Draggable>
+            ))}
+            <FusionZone contents={zone} onClear={() => {
+              spawnMany(zone); setZone([]); setZoneFx(null);
+            }} fx={zoneFx} />
+          </main>
+
+          <Inventory discovered={discovered} onSpawn={spawn} />
+
+          {toast && <div className="toast">{toast.msg}</div>}
+          {showEncyclopedia && <Encyclopedia discovered={discovered} onClose={() => setShowEncyclopedia(false)} />}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
