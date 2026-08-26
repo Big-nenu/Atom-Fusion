@@ -53,6 +53,10 @@ export default function Draggable({
     const d = dragRef.current
     if (!d.dragging) return
     const el = ref.current
+    // Medir el centro ANTES de quitar el transform: así refleja la posición
+    // visual real durante el arrastre (y no la posición de reposo original,
+    // que haría imposible soltar piezas dentro de la Zona de Fusión).
+    const rect = el.getBoundingClientRect()
     el.classList.remove('dragging')
     el.style.transform = ''
 
@@ -61,9 +65,9 @@ export default function Draggable({
       onRelease({
         pointerX: e.clientX,
         pointerY: e.clientY,
-        // Centro real (en reposo) del elemento, útil para hit-test de la olla.
-        centerX: el.getBoundingClientRect().left + el.offsetWidth / 2,
-        centerY: el.getBoundingClientRect().top + el.offsetHeight / 2,
+        // Centro visual real de la pieza al soltar, útil para el hit-test de la olla.
+        centerX: rect.left + el.offsetWidth / 2,
+        centerY: rect.top + el.offsetHeight / 2,
       })
     }
   }

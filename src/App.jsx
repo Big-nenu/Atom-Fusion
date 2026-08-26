@@ -11,34 +11,33 @@ import FusionZone from './components/FusionZone.jsx'
 import Inventory from './components/Inventory.jsx'
 import Encyclopedia from './components/Encyclopedia.jsx'
 
+function clamp(val, min, max) {
+  return Math.max(min, Math.min(max, val))
+}
+
 export default function App() {
-  // ---- Estado central ----
   const [discovered, setDiscovered] = useState(() => {
     const saved = localStorage.getItem('atom-fusion-discovered')
     if (saved) {
-      try {
-        return new Set(JSON.parse(saved))
-      } catch (e) {
-        console.error('Error loading progress:', e)
-      }
+      try { return new Set(JSON.parse(saved)) } catch (e) { console.error(e) }
     }
     return new Set(STARTING_PARTICLE_IDS)
   })
-  const [board, setBoard] = useState([]) // piezas sueltas: {localId, particleId, x, y}
-  const [zone, setZone] = useState([]) // contenido de la olla: [particleId, ...]
-  const [zoneFx, setZoneFx] = useState(null) // {type:'fuse'|'error', result?}
-  const [toast, setToast] = useState(null) // {id, msg}
+  const [board, setBoard] = useState([])
+  const [zone, setZone] = useState([])
+  const [zoneFx, setZoneFx] = useState(null)
+  const [toast, setToast] = useState(null)
   const [showEncyclopedia, setShowEncyclopedia] = useState(false)
 
-  // ---- Refs ----
   const nextId = useRef(1)
   const boardRef = useRef(null)
   const zoneRef = useRef(null)
   const fxTimer = useRef(null)
   const toastTimer = useRef(null)
   const latestZone = useRef([])
+  const rejectTimer = useRef(null)
+  const initialized = useRef(false)
 
-  // Persistencia de descubrimientos
   useEffect(() => {
     localStorage.setItem('atom-fusion-discovered', JSON.stringify([...discovered]))
   }, [discovered])
@@ -46,20 +45,14 @@ export default function App() {
   const discoveredCount = ALL_PARTICLE_IDS.filter((id) => discovered.has(id)).length
   const total = ALL_PARTICLE_IDS.length
 
-  // ---- Utilidades ----
   function getSpawnPos() {
     const el = boardRef.current
     const w = el?.clientWidth || 360
     const h = el?.clientHeight || 300
     const cx = w / 2
     const cy = h / 2
-
-    // Evitar que aparezcan sobre la zona de fusión (aproximadamente el centro)
-    // Radio de seguridad para no solapar con FusionZone
     const minRadius = 140 
-
-    let x, y
-    let attempts = 0
+    let x, y, attempts = 0
     do {
       const r = Math.max(minRadius, 130 + (Math.random() * Math.min(w, h)) / 2)
       const ang = Math.random() * Math.PI * 2
@@ -67,7 +60,6 @@ export default function App() {
       y = clamp(cy + Math.sin(ang) * r, 60, h - 60)
       attempts++
     } while (attempts < 10 && Math.hypot(x - cx, y - cy) < minRadius)
-
     return { x, y }
   }
 
@@ -87,92 +79,119 @@ export default function App() {
     setBoard((b) => [...b, ...newPieces])
   }
 
-  function clearBoard() {
-    setBoard([])
-  }
+  function clearBoard() { setBoard([]) }
 
   function unlock(particleId) {
-    setDiscovered((prev) => {
-      if (prev.has(particleId)) return prev
-      return new Set(prev).add(particleId)
-    })
+    setDiscovered((prev) => prev.has(particleId) ? prev : new Set(prev).add(particleId))
   }
 
   function notify(msg) {
     clearTimeout(toastTimer.current)
     setToast({ id: Date.now(), msg })
-    toastTimer.current = setTimeout(() => setToast(null), 2200)
+    toastTimer.current = setTimeout(() => setToast(null), 3000)
   }
-
-  function clearFxTimer() {
-    clearTimeout(fxTimer.current)
-  }
-
-  function clamp(v, min, max) {
-    return Math.max(min, Math.min(max, v))
-  }
-// ---- Resolución automática del contenido de la olla ----
-  useEffect(() => {
-    latestZone.current = zone
-    if (zone.length === 0) return
-
-    const res = resolveRecipe(zone)
-    clearFxTimer()
-
-    if (res.type === 'fuse') {
-      const name = PARTICLES[res.result].name
-      setZone([])
-      unlock(res.result)
-      spawn(res.result)
-      setZoneFx({ type: 'fuse', result: res.result })
-      notify(`Nuevo descubrimiento: ${name}`)
-      fxTimer.current = setTimeout(() => setZoneFx(null), 900)
-    } else if (res.type === 'invalid') {
-      setZoneFx({ type: 'error' })
-      fxTimer.current = setTimeout(() => {
-        setZoneFx(null)
-        spawnMany(latestZone.current)
-        setZone([])
-      }, 850)
-    }
-    // 'incomplete' -> se esperan más piezas, sin hacer nada aún.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zone])
 
   function handleDrop(localId, pos) {
-    const item = board.find((i) => i.localId === localId)
-    if (!item) return
-
-    const zoneRect = zoneRef.current?.getBoundingClientRect()
-    let inZone = false
-    if (zoneRect) {
-      inZone =
-        pos.pointerX >= zoneRect.left &&
-        pos.pointerX <= zoneRect.right &&
-        pos.pointerY >= zoneRect.top &&
-        pos.pointerY <= zoneRect.bottom
+    try {
+      const item = board.find((i) => i.localId === localId)
+      if (!item) return
+      const zoneRect = zoneRef.current?.getBoundingClientRect()
+      let inZone = false
+      if (zoneRect) {
+        inZone = pos.centerX >= zoneRect.left && pos.centerX <= zoneRect.right && 
+                 pos.centerY >= zoneRect.top && pos.centerY <= zoneRect.bottom
+      }
+      if (inZone) {
+        setBoard((prev) => prev.filter((i) => i.localId !== localId))
+        setZone((prev) => [...prev, item.particleId])
+      } else {
+        setBoard((prev) => prev.map((p) => {
+          if (p.localId === localId) {
+            const br = boardRef.current?.getBoundingClientRect()
+            const offX = br?.left || 0
+            const offY = br?.top || 0
+            let fX = pos.centerX - offX - 30
+            let fY = pos.centerY - offY - 30
+            const w = br?.width || 360, h = br?.height || 300
+            fX = clamp(fX, 0, w - 60)
+            fY = clamp(fY, 0, h - 60)
+            let attempts = 0, overlapped = true
+            while (overlapped && attempts < 5) {
+              overlapped = prev.some(o => o.localId !== localId && Math.hypot(fX - o.x, fY - o.y) < 65)
+              if (overlapped) {
+                fX = clamp(fX + (Math.random() - 0.5) * 40, 0, w - 60)
+                fY = clamp(fY + (Math.random() - 0.5) * 40, 0, h - 60)
+              }
+              attempts++
+            }
+            return { ...p, x: fX, y: fY }
+          }
+          return p
+        }))
+      }
+    } catch (e) {
+      console.error(e)
+      setBoard(prev => prev.map(p => p.localId === localId ? { ...p, x: pos.centerX - 30, y: pos.centerY - 30 } : p))
     }
-    if (!inZone) return // volver a su sitio (snap back)
+  }
 
-    setBoard((prev) => prev.filter((i) => i.localId !== localId))
-    setZone((prev) => [...prev, item.particleId])
+  // Devuelve al tablero todo lo que haya en la olla (expulsión tras error
+  // y botón "Vaciar"). Usa `latestZone` (ref sincronizado con `zone` en cada
+  // render) para evitar capturar closures obsoletos en timers diferidos.
+  function rejectZone() {
+    if (fxTimer.current) clearTimeout(fxTimer.current)
+    if (rejectTimer.current) clearTimeout(rejectTimer.current)
+    const contents = latestZone.current
+    latestZone.current = []
+    if (contents.length > 0) spawnMany(contents)
+    setZone([])
+    setZoneFx(null)
   }
 
   function clearZone() {
-    clearFxTimer()
-    if (zone.length > 0) {
-      spawnMany(zone)
-      setZone([])
+    rejectZone()
+  }
+
+  useEffect(() => {
+    latestZone.current = zone
+    if (zone.length < 2) return
+
+    const currentZone = [...zone]
+    const outcome = resolveRecipe(currentZone)
+
+    if (outcome.type === 'invalid') {
+      // ERROR INSTANTÁNEO: Sin timers, respuesta inmediata
+      setZoneFx({ type: 'error' })
+      notify('La fusión falló...')
+      rejectTimer.current = setTimeout(rejectZone, 400)
+    } else if (outcome.type === 'fuse') {
+      // ÉXITO RÁPIDO: Solo un pequeño delay visual para el efecto
+      fxTimer.current = setTimeout(() => {
+        const pid = outcome.result
+        setZoneFx({ type: 'fuse', result: pid })
+        unlock(pid)
+        notify(`¡Fusionado: ${PARTICLES[pid].name}!`)
+        latestZone.current = []
+        setZone([])
+        spawn(pid)
+      }, 200)
+    } else {
+      // Incompleto: no hacemos nada, esperamos más piezas
       setZoneFx(null)
     }
-  }  // ---- Núcleo inicial del tablero (una sola vez, aunque StrictMode
-  //      re-monte el componente en desarrollo) ----
-  const didInit = useRef(false)
+
+    return () => {
+      if (fxTimer.current) clearTimeout(fxTimer.current)
+      if (rejectTimer.current) clearTimeout(rejectTimer.current)
+    }
+  }, [zone])
+
   useEffect(() => {
-    if (didInit.current) return
-    didInit.current = true
+    // StrictMode (solo desarrollo) monta dos veces; este guard evita que el
+    // spawn inicial se duplique (10 piezas en vez de 5).
+    if (initialized.current) return
+    initialized.current = true
     spawnMany(['up', 'up', 'down', 'electron', 'photon'])
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (
@@ -180,66 +199,22 @@ export default function App() {
       <header className="app-header">
         <h1>⚛️ Atom-Fusion</h1>
         <div className="header-right">
-          <span className="progress" data-testid="progress">
-            {discoveredCount} / {total}
-          </span>
-          <button
-            type="button"
-            className="mini-ency"
-            title="Limpiar tablero"
-            onClick={clearBoard}
-            aria-label="Limpiar tablero"
-          >
-            🧹
-          </button>
-          <button
-            type="button"
-            className="mini-ency"
-            data-testid="open-encyclopedia"
-            onClick={() => setShowEncyclopedia(true)}
-            aria-label="Abrir enciclopedia"
-          >
-            📖
-          </button>
+          <span className="progress">{discoveredCount} / {total}</span>
+          <button className="mini-ency" onClick={clearBoard} title="Limpiar">🧹</button>
+          <button className="mini-ency" onClick={() => setShowEncyclopedia(true)}>📖</button>
         </div>
       </header>
-
       <main className="board" ref={boardRef}>
-        {board.map((piece) => {
-          const p = PARTICLES[piece.particleId]
-          return (
-            <Draggable
-              key={piece.localId}
-              dataTestId={`board-${piece.particleId}-${piece.localId}`}
-              style={{ left: piece.x, top: piece.y }}
-              onRelease={(pos) => handleDrop(piece.localId, pos)}
-            >
-              <ParticleChip particle={p} size={58} compact />
-            </Draggable>
-          )
-        })}
-
+        {board.map((piece) => (
+          <Draggable key={piece.localId} style={{ left: piece.x, top: piece.y }} onRelease={(pos) => handleDrop(piece.localId, pos)}>
+            <ParticleChip particle={PARTICLES[piece.particleId]} size={58} compact />
+          </Draggable>
+        ))}
         <FusionZone ref={zoneRef} contents={zone} onClear={clearZone} fx={zoneFx} />
       </main>
-
-      <Inventory
-        discovered={discovered}
-        onSpawn={spawn}
-        onOpenEncyclopedia={() => setShowEncyclopedia(true)}
-      />
-
-      {toast && (
-        <div className="toast" key={toast.id} data-testid="toast">
-          {toast.msg}
-        </div>
-      )}
-
-      {showEncyclopedia && (
-        <Encyclopedia
-          discovered={discovered}
-          onClose={() => setShowEncyclopedia(false)}
-        />
-      )}
+      <Inventory discovered={discovered} onSpawn={spawn} onOpenEncyclopedia={() => setShowEncyclopedia(true)} />
+      {toast && <div className="toast">{toast.msg}</div>}
+      {showEncyclopedia && <Encyclopedia discovered={discovered} onClose={() => setShowEncyclopedia(false)} />}
     </div>
   )
 }
