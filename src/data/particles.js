@@ -54,6 +54,17 @@ export const PARTICLES = {
     emoji: '✨',
     description: 'Cuantum de luz. Sin masa y siempre veloz.',
   },
+  positron: {
+    id: 'positron',
+    name: 'Positrón',
+    symbol: 'e⁺',
+    category: 'antimateria',
+    level: 1,
+    color: '#ff4081',
+    emoji: '⚡️',
+    description: 'La antipartícula del electrón: misma masa, carga positiva.',
+    lore: 'El positrón es la imagen especular del electrón: existe, pero con carga opuesta. Cuando una partícula y su antipartícula se encuentran, ambas se aniquilan convirtiendo toda su masa en energía (rayos gamma). Los positrones también se producen en el centro de las estrellas y en rayos cósmicos.',
+  },
 
   // ---- Nivel 2: compuestas ----
   proton: {
@@ -88,8 +99,29 @@ export const PARTICLES = {
     emoji: '🎯',
     description: 'Núcleo alfa: 2 protones y 2 neutrones unidos.',
   },
-
   // ---- Nivel 4: átomos ----
+  beryllium: {
+    id: 'beryllium',
+    name: 'Berilio',
+    symbol: 'Be',
+    category: 'atomo',
+    level: 4,
+    color: '#8e24aa',
+    emoji: '💠',
+    description: 'Primer escalón de la quema de helio: dos núcleos de helio que se fusionan en el corazón estelar.',
+    lore: 'Cuando el núcleo de una estrella se queda sin hidrógeno, empieza a quemar helio. Dos núcleos de ⁴He se fusionan y dan un núcleo de berilio (⁸Be), tan inestable que se auto-destruye al instante... a menos que capture otro helio justo antes.',
+  },
+  carbon: {
+    id: 'carbon',
+    name: 'Carbono',
+    symbol: 'C',
+    category: 'atomo',
+    level: 4,
+    color: '#455a64',
+    emoji: '⚫',
+    description: 'Núcleo C-12 (6 protones y 6 neutrones), forjado por fusión estelar. Base de la química orgánica.',
+    lore: 'La "triple alfa": el berilio recién formado captura de inmediato un tercer núcleo de helio y produce carbono-12. Es el origen de todo el carbono del universo, y con él el del oxígeno y de la vida.',
+  },
   hydrogen: {
     id: 'hydrogen',
     name: 'Hidrógeno',
@@ -122,9 +154,42 @@ export const PARTICLES = {
     emoji: '💦',
     description: '2 átomos de Hidrógeno + 1 de Oxígeno. ¡La molécula de la vida!',
   },
+  carbon_dioxide: {
+    id: 'carbon_dioxide',
+    name: 'Dióxido de Carbono',
+    symbol: 'CO₂',
+    category: 'molécula',
+    level: 5,
+    color: '#bdbdbd',
+    emoji: '🌫️',
+    description: '1 átomo de Carbono + 2 de Oxígeno. Gas de efecto invernadero.',
+    lore: 'En las estrellas muy masivas, el carbono quemado acaba combinándose con oxígeno y esparciéndose como CO₂ por el espacio. En la Tierra, ese mismo gas regula el clima (efecto invernadero) y es vital para la fotosíntesis.',
+  },
+  methane: {
+    id: 'methane',
+    name: 'Metano',
+    symbol: 'CH₄',
+    category: 'molécula',
+    level: 5,
+    color: '#ff7043',
+    emoji: '🔥',
+    description: '1 átomo de Carbono + 4 de Hidrógeno. Gas combustible natural.',
+    lore: 'Una molécula de carbono que atrapa cuatro hidrógenos. Es el gas más abundante en la atmósfera de lunas como Titán y aparece en el medio interestelar: un puente entre la astrofísica y el gas natural terrestre.',
+  },
+  ozone: {
+    id: 'ozone',
+    name: 'Ozono',
+    symbol: 'O₃',
+    category: 'molécula',
+    level: 5,
+    color: '#4fc3f7',
+    emoji: '🛡️',
+    description: '3 átomos de Oxígeno unidos. Nos protege de los rayos UV.',
+    lore: 'Tres átomos de oxígeno unidos. En la alta atmósfera forma la capa de ozono que bloquea la radiación ultravioleta del Sol; sin ella, la vida en la superficie de la Tierra no podría existir.',
+  },
 }
 
 export const ALL_PARTICLE_IDS = Object.keys(PARTICLES)
 
 // Las que el jugador tiene al empezar.
-export const STARTING_PARTICLE_IDS = ['up', 'down', 'electron', 'photon']
+export const STARTING_PARTICLE_IDS = ['up', 'down', 'electron', 'photon', 'positron']

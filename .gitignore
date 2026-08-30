@@ -23,3 +23,12 @@ desktop.ini
 .env
 .env.local
 .env.*.local
+
+# Documentos personales del autor (no se suben al repo)
+Atom-Fusion-Resumen.md
+Atom-Fusion-Resumen.docx
+Atom-Fusion-Plan-Maestro.md
+Atom-Fusion-Plan-Maestro.docx
+
+# Reglas locales de Cline (no se comparten)
+.clinerules/

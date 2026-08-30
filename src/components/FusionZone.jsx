@@ -10,7 +10,7 @@ import ParticleChip from './ParticleChip.jsx'
 // ============================================================
 
 const FusionZone = forwardRef(function FusionZone(
-  { contents, onClear, fx },
+  { contents, onClear, fx, onRemovePiece },
   zoneRef
 ) {
   const hasItems = contents.length > 0
@@ -29,11 +29,20 @@ const FusionZone = forwardRef(function FusionZone(
         {hasItems ? (
           <div className="zone-contents">
             {contents.map((id, i) => (
-              <ParticleChip key={`${id}-${i}`} particle={PARTICLES[id]} size={46} compact />
+              <button
+                type="button"
+                key={`${id}-${i}`}
+                className="zone-piece"
+                onClick={() => onRemovePiece && onRemovePiece(i)}
+                aria-label={`Quitar ${PARTICLES[id]?.name} de la zona`}
+                title="Tocar para quitar"
+              >
+                <ParticleChip particle={PARTICLES[id]} size={46} compact />
+              </button>
             ))}
           </div>
         ) : (
-          <span className="zone-empty">Arrastra aquí</span>
+          <span className="zone-empty">Arrastra aquí o toca en el inventario</span>
         )}
 
         {fx && fx.type === 'fuse' && (

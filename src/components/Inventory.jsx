@@ -3,11 +3,11 @@ import ParticleChip from './ParticleChip.jsx'
 
 // ============================================================
 // Inventario inferior. Muestra todas las partículas descubiertas.
-// Tocar una de ellas la copia al tablero (recursos infinitos).
+// Tocar una de ellas la envía directamente a la Zona de Fusión.
 // Las no descubiertas aparecen bloqueadas con "?".
 // ============================================================
 
-export default function Inventory({ discovered, onSpawn, onOpenEncyclopedia }) {
+export default function Inventory({ discovered, onAddToZone, onOpenEncyclopedia }) {
   return (
     <nav className="inventory" aria-label="Inventario de partículas">
       <div className="inventory-scroll">
@@ -21,7 +21,7 @@ export default function Inventory({ discovered, onSpawn, onOpenEncyclopedia }) {
               className={`inv-item${unlocked ? '' : ' inv-locked'}`}
               disabled={!unlocked}
               data-testid={`inventory-${id}`}
-              onClick={() => unlocked && onSpawn(id)}
+              onClick={() => unlocked && onAddToZone(id)}
             >
               <ParticleChip particle={p} size={48} compact />
               <span className="inv-label">{p.symbol}</span>

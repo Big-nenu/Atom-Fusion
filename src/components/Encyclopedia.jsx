@@ -55,6 +55,7 @@ export default function Encyclopedia({ discovered, onClose }) {
                             <strong>{p.name}</strong>
                             <em className="ency-symbol">{p.symbol}</em>
                             <p className="ency-desc">{p.description}</p>
+                            {p.lore && <p className="ency-lore">✨ {p.lore}</p>}
                             {recipe && (
                               <div className="ency-recipe">
                                 {Object.entries(countsOf(
